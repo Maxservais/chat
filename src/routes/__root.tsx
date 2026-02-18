@@ -1,12 +1,24 @@
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
-import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
-import { TanStackDevtools } from '@tanstack/react-devtools'
+/// <reference types="vite/client" />
+import {
+  HeadContent,
+  Outlet,
+  Scripts,
+  createRootRouteWithContext,
+} from '@tanstack/react-router'
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
+import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
+import type { QueryClient } from '@tanstack/react-query'
 
 import Header from '../components/Header'
+import { DefaultCatchBoundary } from '../components/DefaultCatchBoundary'
+import { NotFound } from '../components/NotFound'
+import { seo } from '../utils/seo'
 
 import appCss from '../styles.css?url'
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<{
+  queryClient: QueryClient
+}>()({
   head: () => ({
     meta: [
       {
@@ -16,40 +28,60 @@ export const Route = createRootRoute({
         name: 'viewport',
         content: 'width=device-width, initial-scale=1',
       },
-      {
-        title: 'TanStack Start Starter',
-      },
+      ...seo({
+        title: 'My TanStack Start App',
+        description: 'Full-stack app powered by TanStack Start on Cloudflare',
+      }),
     ],
     links: [
       {
         rel: 'stylesheet',
         href: appCss,
       },
+      { rel: 'icon', href: '/favicon.ico' },
     ],
   }),
-  shellComponent: RootDocument,
+  errorComponent: (props) => {
+    return (
+      <RootDocument>
+        <DefaultCatchBoundary {...props} />
+      </RootDocument>
+    )
+  },
+  notFoundComponent: () => <NotFound />,
+  component: RootComponent,
 })
+
+function RootComponent() {
+  return (
+    <RootDocument>
+      <Outlet />
+    </RootDocument>
+  )
+}
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" data-theme="workers">
       <head>
         <HeadContent />
-      </head>
-      <body>
-        <Header />
-        {children}
-        <TanStackDevtools
-          config={{
-            position: 'bottom-right',
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(() => {
+              const mode = localStorage.getItem("theme") || "light";
+              document.documentElement.setAttribute("data-mode", mode);
+              document.documentElement.style.colorScheme = mode;
+            })();`,
           }}
-          plugins={[
-            {
-              name: 'Tanstack Router',
-              render: <TanStackRouterDevtoolsPanel />,
-            },
-          ]}
         />
+      </head>
+      <body className="flex flex-col h-screen">
+        <Header />
+        <main className="flex-1 flex flex-col min-h-0">
+          {children}
+        </main>
+        <TanStackRouterDevtools position="bottom-right" />
+        <ReactQueryDevtools buttonPosition="bottom-left" />
         <Scripts />
       </body>
     </html>

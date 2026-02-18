@@ -1,5 +1,6 @@
 {
   "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules", "dist", ".agents-starter"],
   "compilerOptions": {
     "target": "ES2022",
     "jsx": "react-jsx",
@@ -7,7 +8,6 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": [
         "./worker-configuration.d.ts",
-        "node",
         "vite/client"
     ],
 
@@ -15,6 +15,7 @@
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
+    "resolveJsonModule": true,
     "noEmit": true,
 
     /* Linting */
@@ -24,6 +25,8 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
+    "noUncheckedIndexedAccess": true,
+    "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]

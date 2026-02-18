@@ -5,14 +5,29 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "my-tanstack-start-app",
-	"compatibility_date": "2025-09-02",
+	"compatibility_date": "2026-01-28",
 	"compatibility_flags": [
 		"nodejs_compat"
 	],
-	"main": "@tanstack/react-start/server-entry",
+	"main": "src/server/entry.ts",
 	"observability": {
 		"enabled": true
-	}
+	},
+	"ai": { "binding": "AI", "remote": true },
+	"durable_objects": {
+		"bindings": [
+			{
+				"class_name": "ChatAgent",
+				"name": "ChatAgent"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"new_sqlite_classes": ["ChatAgent"],
+			"tag": "v1"
+		}
+	]
 	/**
 	 * Smart Placement
 	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
