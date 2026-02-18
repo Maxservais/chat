@@ -3,16 +3,13 @@ import { useAgent } from "agents/react";
 import { useAgentChat } from "@cloudflare/ai-chat/react";
 import { isToolUIPart } from "ai";
 import type { UIMessage } from "ai";
-import {
-  Button,
-  Badge,
-  InputArea,
-  Empty,
-  Text
-} from "@cloudflare/kumo";
-import { Toasty, useKumoToastManager } from "@cloudflare/kumo/components/toast";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { Toaster } from "@/components/ui/sonner";
 import { Streamdown } from "streamdown";
-import { Switch } from "@cloudflare/kumo";
 import {
   PaperPlaneRightIcon,
   StopIcon,
@@ -21,10 +18,9 @@ import {
   CircleIcon,
   BrainIcon,
   CaretDownIcon,
-  BugIcon
+  BugIcon,
 } from "@phosphor-icons/react";
 
-import { ThemeToggle } from "./ThemeToggle";
 import { ToolPartView } from "./ToolPartView";
 
 function Chat() {
@@ -33,7 +29,6 @@ function Chat() {
   const [showDebug, setShowDebug] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const toasts = useKumoToastManager();
 
   const agent = useAgent({
     agent: "ChatAgent",
@@ -48,18 +43,16 @@ function Chat() {
         try {
           const data = JSON.parse(String(message.data));
           if (data.type === "scheduled-task") {
-            toasts.add({
-              title: "Scheduled task completed",
+            toast("Scheduled task completed", {
               description: data.description,
-              timeout: 0
             });
           }
         } catch {
           // Not JSON or not our event
         }
       },
-      [toasts]
-    )
+      []
+    ),
   });
 
   const {
@@ -68,7 +61,7 @@ function Chat() {
     clearHistory,
     addToolApprovalResponse,
     stop,
-    status
+    status,
   } = useAgentChat({
     agent,
     onToolCall: async (event) => {
@@ -80,11 +73,11 @@ function Chat() {
           toolCallId: event.toolCall.toolCallId,
           output: {
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            localTime: new Date().toLocaleTimeString()
-          }
+            localTime: new Date().toLocaleTimeString(),
+          },
         });
       }
-    }
+    },
   });
 
   const isStreaming = status === "streaming" || status === "submitted";
@@ -93,7 +86,6 @@ function Chat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Re-focus the input after streaming ends
   useEffect(() => {
     if (!isStreaming && textareaRef.current) {
       textareaRef.current.focus();
@@ -111,12 +103,12 @@ function Chat() {
   }, [input, isStreaming, sendMessage]);
 
   return (
-    <div className="flex flex-col h-full bg-kumo-elevated">
+    <div className="flex flex-col h-full bg-muted/30">
       {/* Header */}
-      <header className="px-5 py-4 bg-kumo-base border-b border-kumo-line">
+      <header className="px-5 py-4 bg-background border-b border-border">
         <div className="max-w-3xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <h1 className="text-lg font-semibold text-kumo-default">
+            <h1 className="text-lg font-semibold text-foreground">
               <span className="mr-2">⛅</span>Agent Starter
             </h1>
             <Badge variant="secondary">
@@ -129,14 +121,14 @@ function Chat() {
               <CircleIcon
                 size={8}
                 weight="fill"
-                className={connected ? "text-kumo-success" : "text-kumo-danger"}
+                className={connected ? "text-green-500" : "text-destructive"}
               />
-              <Text size="xs" variant="secondary">
+              <span className="text-xs text-muted-foreground">
                 {connected ? "Connected" : "Disconnected"}
-              </Text>
+              </span>
             </div>
             <div className="flex items-center gap-1.5">
-              <BugIcon size={14} className="text-kumo-inactive" />
+              <BugIcon size={14} className="text-muted-foreground" />
               <Switch
                 checked={showDebug}
                 onCheckedChange={setShowDebug}
@@ -144,12 +136,8 @@ function Chat() {
                 aria-label="Toggle debug mode"
               />
             </div>
-            <ThemeToggle />
-            <Button
-              variant="secondary"
-              icon={<TrashIcon size={16} />}
-              onClick={clearHistory}
-            >
+            <Button variant="outline" size="sm" onClick={clearHistory}>
+              <TrashIcon size={16} />
               Clear
             </Button>
           </div>
@@ -160,35 +148,35 @@ function Chat() {
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-3xl mx-auto px-5 py-6 space-y-5">
           {messages.length === 0 && (
-            <Empty
-              icon={<ChatCircleDotsIcon size={32} />}
-              title="Start a conversation"
-              contents={
-                <div className="flex flex-wrap justify-center gap-2">
-                  {[
-                    "What's the weather in Paris?",
-                    "What timezone am I in?",
-                    "Calculate 5000 * 3",
-                    "Remind me in 5 minutes to take a break"
-                  ].map((prompt) => (
-                    <Button
-                      key={prompt}
-                      variant="outline"
-                      size="sm"
-                      disabled={isStreaming}
-                      onClick={() => {
-                        sendMessage({
-                          role: "user",
-                          parts: [{ type: "text", text: prompt }]
-                        });
-                      }}
-                    >
-                      {prompt}
-                    </Button>
-                  ))}
-                </div>
-              }
-            />
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <ChatCircleDotsIcon size={32} className="text-muted-foreground mb-3" />
+              <p className="text-sm font-medium text-foreground mb-1">
+                Start a conversation
+              </p>
+              <div className="flex flex-wrap justify-center gap-2 mt-3">
+                {[
+                  "What's the weather in Paris?",
+                  "What timezone am I in?",
+                  "Calculate 5000 * 3",
+                  "Remind me in 5 minutes to take a break",
+                ].map((prompt) => (
+                  <Button
+                    key={prompt}
+                    variant="outline"
+                    size="sm"
+                    disabled={isStreaming}
+                    onClick={() => {
+                      sendMessage({
+                        role: "user",
+                        parts: [{ type: "text", text: prompt }],
+                      });
+                    }}
+                  >
+                    {prompt}
+                  </Button>
+                ))}
+              </div>
+            </div>
           )}
 
           {messages.map((message: UIMessage, index: number) => {
@@ -199,7 +187,7 @@ function Chat() {
             return (
               <div key={message.id} className="space-y-2">
                 {showDebug && (
-                  <pre className="text-[11px] text-kumo-subtle bg-kumo-control rounded-lg p-3 overflow-auto max-h-64">
+                  <pre className="text-[11px] text-muted-foreground bg-muted rounded-lg p-3 overflow-auto max-h-64">
                     {JSON.stringify(message, null, 2)}
                   </pre>
                 )}
@@ -231,25 +219,25 @@ function Chat() {
                       <div key={i} className="flex justify-start">
                         <details className="max-w-[85%] w-full" open={!isDone}>
                           <summary className="flex items-center gap-2 cursor-pointer px-3 py-2 rounded-lg bg-purple-500/10 border border-purple-500/20 text-sm select-none">
-                            <BrainIcon size={14} className="text-purple-400" />
-                            <span className="font-medium text-kumo-default">
+                            <BrainIcon size={14} className="text-purple-500" />
+                            <span className="font-medium text-foreground">
                               Reasoning
                             </span>
                             {isDone ? (
-                              <span className="text-xs text-kumo-success">
+                              <span className="text-xs text-green-500">
                                 Complete
                               </span>
                             ) : (
-                              <span className="text-xs text-kumo-brand">
+                              <span className="text-xs text-primary">
                                 Thinking...
                               </span>
                             )}
                             <CaretDownIcon
                               size={14}
-                              className="ml-auto text-kumo-inactive"
+                              className="ml-auto text-muted-foreground"
                             />
                           </summary>
-                          <pre className="mt-2 px-3 py-2 rounded-lg bg-kumo-control text-xs text-kumo-default whitespace-pre-wrap overflow-auto max-h-64">
+                          <pre className="mt-2 px-3 py-2 rounded-lg bg-muted text-xs text-foreground whitespace-pre-wrap overflow-auto max-h-64">
                             {reasoning.text}
                           </pre>
                         </details>
@@ -267,7 +255,7 @@ function Chat() {
                     if (isUser) {
                       return (
                         <div key={i} className="flex justify-end">
-                          <div className="max-w-[85%] px-4 py-2.5 rounded-2xl rounded-br-md bg-kumo-contrast text-kumo-inverse leading-relaxed">
+                          <div className="max-w-[85%] px-4 py-2.5 rounded-2xl rounded-br-md bg-primary text-primary-foreground leading-relaxed">
                             {text}
                           </div>
                         </div>
@@ -276,7 +264,7 @@ function Chat() {
 
                     return (
                       <div key={i} className="flex justify-start">
-                        <div className="max-w-[85%] rounded-2xl rounded-bl-md bg-kumo-base text-kumo-default leading-relaxed">
+                        <div className="max-w-[85%] rounded-2xl rounded-bl-md bg-background text-foreground leading-relaxed">
                           <Streamdown
                             className="sd-theme rounded-2xl rounded-bl-md p-3"
                             controls={false}
@@ -297,7 +285,7 @@ function Chat() {
       </div>
 
       {/* Input */}
-      <div className="border-t border-kumo-line bg-kumo-base">
+      <div className="border-t border-border bg-background">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -305,11 +293,11 @@ function Chat() {
           }}
           className="max-w-3xl mx-auto px-5 py-4"
         >
-          <div className="flex items-end gap-3 rounded-xl border border-kumo-line bg-kumo-base p-3 shadow-sm focus-within:ring-2 focus-within:ring-kumo-ring focus-within:border-transparent transition-shadow">
-            <InputArea
+          <div className="flex items-end gap-3 rounded-xl border border-border bg-background p-3 shadow-sm focus-within:ring-2 focus-within:ring-ring focus-within:border-transparent transition-shadow">
+            <Textarea
               ref={textareaRef}
               value={input}
-              onValueChange={setInput}
+              onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
@@ -324,28 +312,29 @@ function Chat() {
               placeholder="Send a message..."
               disabled={!connected || isStreaming}
               rows={1}
-              className="flex-1 !ring-0 focus:!ring-0 !shadow-none !bg-transparent !outline-none resize-none max-h-40"
+              className="flex-1 ring-0! focus-visible:ring-0! shadow-none! bg-transparent! outline-none! border-none! resize-none max-h-40 min-h-0"
             />
             {isStreaming ? (
               <Button
                 type="button"
-                variant="secondary"
-                shape="square"
+                variant="outline"
+                size="icon"
                 aria-label="Stop generation"
-                icon={<StopIcon size={18} />}
                 onClick={stop}
                 className="mb-0.5"
-              />
+              >
+                <StopIcon size={18} />
+              </Button>
             ) : (
               <Button
                 type="submit"
-                variant="primary"
-                shape="square"
+                size="icon"
                 aria-label="Send message"
                 disabled={!input.trim() || !connected}
-                icon={<PaperPlaneRightIcon size={18} />}
                 className="mb-0.5"
-              />
+              >
+                <PaperPlaneRightIcon size={18} />
+              </Button>
             )}
           </div>
         </form>
@@ -356,16 +345,17 @@ function Chat() {
 
 export default function AgentChat() {
   return (
-    <Toasty>
+    <>
       <Suspense
         fallback={
-          <div className="flex items-center justify-center h-full text-kumo-inactive">
+          <div className="flex items-center justify-center h-full text-muted-foreground">
             Loading...
           </div>
         }
       >
         <Chat />
       </Suspense>
-    </Toasty>
+      <Toaster />
+    </>
   );
 }

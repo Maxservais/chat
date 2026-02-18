@@ -1,6 +1,7 @@
 import { isToolUIPart, getToolName } from "ai";
 import type { UIMessage } from "ai";
-import { Button, Badge, Surface, Text } from "@cloudflare/kumo";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   GearIcon,
   CheckCircleIcon,
@@ -9,7 +10,7 @@ import {
 
 export function ToolPartView({
   part,
-  addToolApprovalResponse
+  addToolApprovalResponse,
 }: {
   part: UIMessage["parts"][number];
   addToolApprovalResponse: (response: {
@@ -24,20 +25,20 @@ export function ToolPartView({
   if (part.state === "output-available") {
     return (
       <div className="flex justify-start">
-        <Surface className="max-w-[85%] px-4 py-2.5 rounded-xl ring ring-kumo-line">
+        <div className="max-w-[85%] px-4 py-2.5 rounded-xl ring-1 ring-border bg-card">
           <div className="flex items-center gap-2 mb-1">
-            <GearIcon size={14} className="text-kumo-inactive" />
-            <Text size="xs" variant="secondary" bold>
+            <GearIcon size={14} className="text-muted-foreground" />
+            <span className="text-xs font-semibold text-muted-foreground">
               {toolName}
-            </Text>
+            </span>
             <Badge variant="secondary">Done</Badge>
           </div>
           <div className="font-mono">
-            <Text size="xs" variant="secondary">
+            <span className="text-xs text-muted-foreground">
               {JSON.stringify(part.output, null, 2)}
-            </Text>
+            </span>
           </div>
-        </Surface>
+        </div>
       </div>
     );
   }
@@ -47,45 +48,44 @@ export function ToolPartView({
     const approvalId = (part.approval as { id?: string })?.id;
     return (
       <div className="flex justify-start">
-        <Surface className="max-w-[85%] px-4 py-3 rounded-xl ring-2 ring-kumo-warning">
+        <div className="max-w-[85%] px-4 py-3 rounded-xl ring-2 ring-yellow-500 bg-card">
           <div className="flex items-center gap-2 mb-2">
-            <GearIcon size={14} className="text-kumo-warning" />
-            <Text size="sm" bold>
+            <GearIcon size={14} className="text-yellow-500" />
+            <span className="text-sm font-semibold">
               Approval needed: {toolName}
-            </Text>
+            </span>
           </div>
           <div className="font-mono mb-3">
-            <Text size="xs" variant="secondary">
+            <span className="text-xs text-muted-foreground">
               {JSON.stringify(part.input, null, 2)}
-            </Text>
+            </span>
           </div>
           <div className="flex gap-2">
             <Button
-              variant="primary"
               size="sm"
-              icon={<CheckCircleIcon size={14} />}
               onClick={() => {
                 if (approvalId) {
                   addToolApprovalResponse({ id: approvalId, approved: true });
                 }
               }}
             >
+              <CheckCircleIcon size={14} />
               Approve
             </Button>
             <Button
-              variant="secondary"
+              variant="outline"
               size="sm"
-              icon={<XCircleIcon size={14} />}
               onClick={() => {
                 if (approvalId) {
                   addToolApprovalResponse({ id: approvalId, approved: false });
                 }
               }}
             >
+              <XCircleIcon size={14} />
               Reject
             </Button>
           </div>
-        </Surface>
+        </div>
       </div>
     );
   }
@@ -98,15 +98,15 @@ export function ToolPartView({
   ) {
     return (
       <div className="flex justify-start">
-        <Surface className="max-w-[85%] px-4 py-2.5 rounded-xl ring ring-kumo-line">
+        <div className="max-w-[85%] px-4 py-2.5 rounded-xl ring-1 ring-border bg-card">
           <div className="flex items-center gap-2">
-            <XCircleIcon size={14} className="text-kumo-danger" />
-            <Text size="xs" variant="secondary" bold>
+            <XCircleIcon size={14} className="text-destructive" />
+            <span className="text-xs font-semibold text-muted-foreground">
               {toolName}
-            </Text>
+            </span>
             <Badge variant="secondary">Rejected</Badge>
           </div>
-        </Surface>
+        </div>
       </div>
     );
   }
@@ -115,14 +115,14 @@ export function ToolPartView({
   if (part.state === "input-available" || part.state === "input-streaming") {
     return (
       <div className="flex justify-start">
-        <Surface className="max-w-[85%] px-4 py-2.5 rounded-xl ring ring-kumo-line">
+        <div className="max-w-[85%] px-4 py-2.5 rounded-xl ring-1 ring-border bg-card">
           <div className="flex items-center gap-2">
-            <GearIcon size={14} className="text-kumo-inactive animate-spin" />
-            <Text size="xs" variant="secondary">
+            <GearIcon size={14} className="text-muted-foreground animate-spin" />
+            <span className="text-xs text-muted-foreground">
               Running {toolName}...
-            </Text>
+            </span>
           </div>
-        </Surface>
+        </div>
       </div>
     );
   }
