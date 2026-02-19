@@ -13,7 +13,15 @@
 	"observability": {
 		"enabled": true
 	},
-	"ai": { "binding": "AI", "remote": true },
+	"ai": {
+		"binding": "AI",
+		"remote": true
+	},
+	"kv_namespaces": [
+		{
+			"binding": "ETHCC_CACHE"
+		}
+	],
 	"durable_objects": {
 		"bindings": [
 			{
@@ -24,7 +32,9 @@
 	},
 	"migrations": [
 		{
-			"new_sqlite_classes": ["ChatAgent"],
+			"new_sqlite_classes": [
+				"ChatAgent"
+			],
 			"tag": "v1"
 		}
 	]

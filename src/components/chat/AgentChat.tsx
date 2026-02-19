@@ -3,12 +3,10 @@ import { useAgent } from "agents/react";
 import { useAgentChat } from "@cloudflare/ai-chat/react";
 import { isToolUIPart } from "ai";
 import type { UIMessage } from "ai";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { Toaster } from "@/components/ui/sonner";
 import { Streamdown } from "streamdown";
 import {
   PaperPlaneRightIcon,
@@ -22,6 +20,13 @@ import {
 } from "@phosphor-icons/react";
 
 import { ToolPartView } from "./ToolPartView";
+
+const STARTER_PROMPTS = [
+  "I'm interested in ZK proofs and privacy",
+  "Show me all DeFi talks",
+  "Help me plan my schedule for Day 1",
+  "What talks are about Layer 2 scaling?",
+];
 
 function Chat() {
   const [connected, setConnected] = useState(false);
@@ -38,21 +43,7 @@ function Chat() {
       (error: Event) => console.error("WebSocket error:", error),
       []
     ),
-    onMessage: useCallback(
-      (message: MessageEvent) => {
-        try {
-          const data = JSON.parse(String(message.data));
-          if (data.type === "scheduled-task") {
-            toast("Scheduled task completed", {
-              description: data.description,
-            });
-          }
-        } catch {
-          // Not JSON or not our event
-        }
-      },
-      []
-    ),
+    onMessage: useCallback(() => {}, []),
   });
 
   const {
@@ -64,20 +55,7 @@ function Chat() {
     status,
   } = useAgentChat({
     agent,
-    onToolCall: async (event) => {
-      if (
-        "addToolOutput" in event &&
-        event.toolCall.toolName === "getUserTimezone"
-      ) {
-        event.addToolOutput({
-          toolCallId: event.toolCall.toolCallId,
-          output: {
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            localTime: new Date().toLocaleTimeString(),
-          },
-        });
-      }
-    },
+    // TODO: add onToolCall handler when getUserTimezone tool is added to the agent
   });
 
   const isStreaming = status === "streaming" || status === "submitted";
@@ -109,11 +87,11 @@ function Chat() {
         <div className="max-w-3xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-semibold text-foreground">
-              <span className="mr-2">⛅</span>Agent Starter
+              <span className="mr-2">📅</span>EthCC Planner
             </h1>
             <Badge variant="secondary">
               <ChatCircleDotsIcon size={12} weight="bold" className="mr-1" />
-              AI Chat
+              Agenda Assistant
             </Badge>
           </div>
           <div className="flex items-center gap-3">
@@ -151,15 +129,13 @@ function Chat() {
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <ChatCircleDotsIcon size={32} className="text-muted-foreground mb-3" />
               <p className="text-sm font-medium text-foreground mb-1">
-                Start a conversation
+                Plan your EthCC agenda
+              </p>
+              <p className="text-xs text-muted-foreground mb-1">
+                Tell me your interests and I'll find the best talks
               </p>
               <div className="flex flex-wrap justify-center gap-2 mt-3">
-                {[
-                  "What's the weather in Paris?",
-                  "What timezone am I in?",
-                  "Calculate 5000 * 3",
-                  "Remind me in 5 minutes to take a break",
-                ].map((prompt) => (
+                {STARTER_PROMPTS.map((prompt) => (
                   <Button
                     key={prompt}
                     variant="outline"
@@ -355,7 +331,6 @@ export default function AgentChat() {
       >
         <Chat />
       </Suspense>
-      <Toaster />
     </>
   );
 }

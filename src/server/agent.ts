@@ -1,6 +1,4 @@
 import { createWorkersAI } from "workers-ai-provider";
-import { type Schedule } from "agents";
-import { getSchedulePrompt, scheduleSchema } from "agents/schedule";
 import { AIChatAgent } from "@cloudflare/ai-chat";
 import {
   streamText,
@@ -12,6 +10,43 @@ import {
   type ToolSet
 } from "ai";
 import { z } from "zod";
+import {
+  fetchTalks,
+  fetchTalkBySlug,
+  fetchDays,
+  fetchLocations,
+  filterRealTalks,
+  searchTalksLocal,
+  filterByTrack,
+  filterByDate,
+  getUniqueTracks,
+  formatTalkForAI,
+} from "./ethcc-api";
+
+/** Escape special ICS characters */
+function escapeICS(s: string): string {
+  return s.replace(/[\\;,]/g, (c) => `\\${c}`).replace(/\n/g, "\\n");
+}
+
+const VTIMEZONE_EUROPE_PARIS = [
+  "BEGIN:VTIMEZONE",
+  "TZID:Europe/Paris",
+  "BEGIN:DAYLIGHT",
+  "TZOFFSETFROM:+0100",
+  "TZOFFSETTO:+0200",
+  "TZNAME:CEST",
+  "DTSTART:19700329T020000",
+  "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU",
+  "END:DAYLIGHT",
+  "BEGIN:STANDARD",
+  "TZOFFSETFROM:+0200",
+  "TZOFFSETTO:+0100",
+  "TZNAME:CET",
+  "DTSTART:19701025T030000",
+  "RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU",
+  "END:STANDARD",
+  "END:VTIMEZONE",
+].join("\r\n");
 
 export class ChatAgent extends AIChatAgent<Env> {
   async onChatMessage(
@@ -19,151 +54,172 @@ export class ChatAgent extends AIChatAgent<Env> {
     options?: { abortSignal?: AbortSignal }
   ) {
     const workersai = createWorkersAI({ binding: this.env.AI });
+    const kv = this.env.ETHCC_CACHE;
 
     const result = streamText({
       // @ts-expect-error -- model not yet in workers-ai-provider type list
       model: workersai("@cf/zai-org/glm-4.7-flash"),
-      system: `You are a helpful assistant. You can check the weather, get the user's timezone, run calculations, and schedule tasks.
+      system: `You are the EthCC Planner, a concise AI assistant that helps attendees plan their EthCC schedule.
 
-${getSchedulePrompt({ date: new Date() })}
+Conference: EthCC[8], June 30 - July 3 2025, Palais des Festivals, Cannes, France.
 
-If the user asks to schedule a task, use the schedule tool to schedule the task.`,
-      // Prune old tool calls to save tokens on long conversations
+Available tracks: Core Protocol | DeFi | Zero Knowledge & Cryptography | Security | Layer 2s, Layers above and beyond | Cypherpunk & Privacy | Token Engineering | For Developers and Users | Product & Marketers | The Unexpected | Real World Ethereum | Entertainment | Governance
+
+IMPORTANT — Response style:
+- Be SHORT and direct. No filler, no "Let me search", no "Great question!"
+- Show at most 10 talks in a markdown table. NEVER output more than 10 rows. If there are more results, mention the total and ask the user to filter further.
+- Table columns: Date | Time | Title | Speaker | Room
+- Flag time conflicts clearly
+- Do NOT repeat or echo tool output — the UI already shows tool results. Just present your curated summary.
+- Do NOT show raw ICS/calendar content — the UI has a download button for that
+- After generating a calendar file, just say "Your calendar is ready — use the download button above"
+- When the user asks you to narrow down or filter results you already have, reason about the data yourself — do NOT make another search call
+
+Tool usage:
+- ALWAYS use the "track" parameter when the user asks for talks in a specific track. Map user intent to the closest track name above. Examples: "DeFi talks" → track:"DeFi", "L2 talks" → track:"Layer 2", "ZK talks" → track:"Zero Knowledge", "security talks" → track:"Security".
+- Use "query" ONLY for free-text keyword search that doesn't map to a track (e.g. "Vitalik", "MEV", "account abstraction").
+- Make ONE search call. Never retry or make a second search call.
+- searchTalks results already include title, start, end, room, speakers, and slug. Use this data DIRECTLY to generate calendar files — do NOT call getTalkDetails first.
+- Only use getTalkDetails when the user asks for more info about a specific talk, and ALWAYS use the exact slug from the searchTalks output. Never guess or construct slugs.
+- Only call getConferenceInfo when the user explicitly asks about tracks, days, or rooms.
+- The query parameter supports multi-word search (each word matched independently, words under 3 chars are ignored). Use short, targeted keywords.
+
+Current date: ${new Date().toISOString().split("T")[0]}`,
       messages: pruneMessages({
         messages: await convertToModelMessages(this.messages),
         toolCalls: "before-last-2-messages"
       }),
       tools: {
-        // Server-side tool: runs automatically on the server
-        getWeather: tool({
-          description: "Get the current weather for a city",
+        searchTalks: tool({
+          description: "Search EthCC talks by keyword, track, date, or type. Use this when the user asks about talks, sessions, or wants recommendations based on their interests.",
           inputSchema: z.object({
-            city: z.string().describe("City name")
+            query: z.string().optional().describe("Free-text search (e.g. 'ZK proofs', 'DeFi yields', 'Vitalik')"),
+            track: z.string().optional().describe("Filter by track name (e.g. 'DeFi', 'Zero Knowledge & Cryptography', 'Security')"),
+            date: z.string().optional().describe("Filter by date in YYYY-MM-DD format (2025-06-30 to 2025-07-03)"),
+            limit: z.number().optional().default(15).describe("Max results to return"),
           }),
-          execute: async ({ city }) => {
-            // Replace with a real weather API in production
-            const conditions = ["sunny", "cloudy", "rainy", "snowy"];
-            const temp = Math.floor(Math.random() * 30) + 5;
-            return {
-              city,
-              temperature: temp,
-              condition:
-                conditions[Math.floor(Math.random() * conditions.length)],
-              unit: "celsius"
-            };
-          }
+          execute: async ({ query, track, date, limit }) => {
+            let talks = await fetchTalks(kv);
+            talks = filterRealTalks(talks);
+
+            if (date) talks = filterByDate(talks, date);
+            if (track) talks = filterByTrack(talks, track);
+            if (query) talks = searchTalksLocal(talks, query);
+
+            talks.sort((a, b) => a.start.localeCompare(b.start));
+
+            const results = talks.slice(0, limit).map(formatTalkForAI);
+            return results.length > 0
+              ? { talks: results, totalMatches: talks.length, showing: results.length }
+              : "No talks found matching your criteria. Try broadening your search or check available tracks with getConferenceInfo.";
+          },
         }),
 
-        // Client-side tool: no execute function — the browser handles it
-        getUserTimezone: tool({
-          description:
-            "Get the user's timezone from their browser. Use this when you need to know the user's local time.",
-          inputSchema: z.object({})
-        }),
-
-        // Approval tool: requires user confirmation before executing
-        calculate: tool({
-          description:
-            "Perform a math calculation with two numbers. Requires user approval for large numbers.",
+        getTalkDetails: tool({
+          description: "Get full details for a specific talk by its slug. Use this when the user wants more info about a particular talk.",
           inputSchema: z.object({
-            a: z.number().describe("First number"),
-            b: z.number().describe("Second number"),
-            operator: z
-              .enum(["+", "-", "*", "/", "%"])
-              .describe("Arithmetic operator")
+            slug: z.string().describe("The talk slug (URL-friendly name, e.g. 'aave-v4-supercharged-defi')"),
           }),
-          needsApproval: async ({ a, b }) =>
-            Math.abs(a) > 1000 || Math.abs(b) > 1000,
-          execute: async ({ a, b, operator }) => {
-            const ops: Record<string, (x: number, y: number) => number> = {
-              "+": (x, y) => x + y,
-              "-": (x, y) => x - y,
-              "*": (x, y) => x * y,
-              "/": (x, y) => x / y,
-              "%": (x, y) => x % y
-            };
-            if (operator === "/" && b === 0) {
-              return { error: "Division by zero" };
-            }
+          execute: async ({ slug }) => {
+            const talk = await fetchTalkBySlug(kv, slug);
+            if (!talk) return "Talk not found. Check the slug and try again.";
             return {
-              expression: `${a} ${operator} ${b}`,
-              result: ops[operator](a, b)
+              title: talk.title,
+              description: talk.extendedProps.description,
+              track: talk.extendedProps.track,
+              type: talk.extendedProps.type,
+              date: talk.start.split("T")[0],
+              start: talk.start,
+              end: talk.end,
+              speakers: talk.extendedProps.speakersData.map((s) => ({
+                name: s.displayName,
+                organization: s.organization,
+              })),
+              room: talk.resourceId,
+              slug: talk.slug,
             };
-          }
+          },
         }),
 
-        scheduleTask: tool({
-          description:
-            "Schedule a task to be executed at a later time. Use this when the user asks to be reminded or wants something done later.",
-          inputSchema: scheduleSchema,
-          execute: async ({ when, description }) => {
-            if (when.type === "no-schedule") {
-              return "Not a valid schedule input";
-            }
-            const input =
-              when.type === "scheduled"
-                ? when.date
-                : when.type === "delayed"
-                  ? when.delayInSeconds
-                  : when.type === "cron"
-                    ? when.cron
-                    : null;
-            if (!input) return "Invalid schedule type";
-            try {
-              this.schedule(input, "executeTask", description);
-              return `Task scheduled: "${description}" (${when.type}: ${input})`;
-            } catch (error) {
-              return `Error scheduling task: ${error}`;
-            }
-          }
-        }),
-
-        getScheduledTasks: tool({
-          description: "List all tasks that have been scheduled",
+        getConferenceInfo: tool({
+          description: "Get EthCC conference information: available tracks, days, and venues. Use when the user asks about the conference structure.",
           inputSchema: z.object({}),
           execute: async () => {
-            const tasks = this.getSchedules();
-            return tasks.length > 0 ? tasks : "No scheduled tasks found.";
-          }
+            const [talks, days, locations] = await Promise.all([
+              fetchTalks(kv).then(filterRealTalks),
+              fetchDays(kv),
+              fetchLocations(kv),
+            ]);
+            return {
+              tracks: getUniqueTracks(talks),
+              days: days.map((d) => d.date),
+              venues: locations.map((l) => ({ name: l.title, floor: l.floor, capacity: l.capacity })),
+              totalTalks: talks.length,
+            };
+          },
         }),
 
-        cancelScheduledTask: tool({
-          description: "Cancel a scheduled task by its ID",
+        generateCalendarFile: tool({
+          description: "Generate an .ics calendar file for selected EthCC talks. Use data directly from searchTalks output (title, start, end, room, speakers) — no need to call getTalkDetails first.",
           inputSchema: z.object({
-            taskId: z.string().describe("The ID of the task to cancel")
+            talks: z.array(z.object({
+              title: z.string(),
+              start: z.string().describe("ISO timestamp e.g. 2025-06-30T15:25:00"),
+              end: z.string().describe("ISO timestamp e.g. 2025-06-30T15:45:00"),
+              room: z.string().optional(),
+              speakers: z.string().optional().describe("Comma-separated speaker names, e.g. 'Alice (Org1), Bob (Org2)'"),
+              description: z.string().optional(),
+            })).describe("Array of talks to add to the calendar"),
           }),
-          execute: async ({ taskId }) => {
-            try {
-              this.cancelSchedule(taskId);
-              return `Task ${taskId} cancelled.`;
-            } catch (error) {
-              return `Error cancelling task: ${error}`;
-            }
-          }
-        })
+          execute: async ({ talks }) => {
+            const events = talks.map((talk) => {
+              const dtStart = talk.start.replace(/[-:]/g, "");
+              const dtEnd = talk.end.replace(/[-:]/g, "");
+              const uid = `${dtStart}-${talk.title.replace(/\s+/g, "-").toLowerCase().slice(0, 40)}@ethcc-planner`;
+              const descParts = [
+                talk.description,
+                talk.speakers ? `Speakers: ${talk.speakers}` : undefined,
+              ].filter(Boolean);
+
+              return [
+                "BEGIN:VEVENT",
+                `UID:${uid}`,
+                `DTSTART;TZID=Europe/Paris:${dtStart}`,
+                `DTEND;TZID=Europe/Paris:${dtEnd}`,
+                `SUMMARY:${escapeICS(talk.title)}`,
+                descParts.length ? `DESCRIPTION:${escapeICS(descParts.join("\n"))}` : "",
+                `LOCATION:${escapeICS(`${talk.room ? `${talk.room}, ` : ""}Palais des Festivals, Cannes`)}`,
+                "END:VEVENT",
+              ].filter(Boolean).join("\r\n");
+            });
+
+            const ics = [
+              "BEGIN:VCALENDAR",
+              "VERSION:2.0",
+              "PRODID:-//EthCC Planner//EN",
+              "CALSCALE:GREGORIAN",
+              "METHOD:PUBLISH",
+              "X-WR-CALNAME:My EthCC Schedule",
+              "X-WR-TIMEZONE:Europe/Paris",
+              VTIMEZONE_EUROPE_PARIS,
+              ...events,
+              "END:VCALENDAR",
+            ].join("\r\n");
+
+            return {
+              icsContent: ics,
+              eventCount: talks.length,
+              message: `Generated calendar with ${talks.length} event(s). Click the download button to save the .ics file.`,
+            };
+          },
+        }),
       },
+      maxOutputTokens: 2048,
       onFinish,
       stopWhen: stepCountIs(5),
       abortSignal: options?.abortSignal
     });
 
     return result.toUIMessageStreamResponse();
-  }
-
-  async executeTask(description: string, _task: Schedule<string>) {
-    // Do the actual work here (send email, call API, etc.)
-    console.log(`Executing scheduled task: ${description}`);
-
-    // Notify connected clients via a broadcast event.
-    // We use broadcast() instead of saveMessages() to avoid injecting
-    // into chat history — that would cause the AI to see the notification
-    // as new context and potentially loop.
-    this.broadcast(
-      JSON.stringify({
-        type: "scheduled-task",
-        description,
-        timestamp: new Date().toISOString()
-      })
-    );
   }
 }

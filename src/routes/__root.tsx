@@ -29,8 +29,8 @@ export const Route = createRootRouteWithContext<{
         content: 'width=device-width, initial-scale=1',
       },
       ...seo({
-        title: 'My TanStack Start App',
-        description: 'Full-stack app powered by TanStack Start on Cloudflare',
+        title: 'EthCC Planner — AI Agenda Assistant',
+        description: 'AI-powered agenda planner for EthCC. Get personalized talk recommendations and export your schedule.',
       }),
     ],
     links: [
