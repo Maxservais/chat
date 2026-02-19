@@ -19,7 +19,8 @@
 	},
 	"kv_namespaces": [
 		{
-			"binding": "ETHCC_CACHE"
+			"binding": "ETHCC_CACHE",
+			"id": "266123f091ae46959ae414144c1db6a2"
 		}
 	],
 	"durable_objects": {

@@ -10,14 +10,14 @@ src/
 │   ├── entry.ts              ← Cloudflare Worker entry (main)
 │   │   ├── routeAgentRequest()  → /agents/* → ChatAgent Durable Object (WebSocket)
 │   │   └── TanStack Start handler → everything else → SSR pages, server functions
-│   ├── agent.ts              ← ChatAgent Durable Object class
+│   ├── agent.ts              ← ChatAgent Durable Object class (tools, system prompt, ICS generation)
+│   ├── ethcc-api.ts          ← EthCC tRPC API client, KV caching, search/filter helpers
 │   ├── middleware/            ← TanStack Start server middleware (future)
 │   └── functions/             ← TanStack Start server functions (future)
 ├── components/
 │   ├── chat/
 │   │   ├── AgentChat.tsx      ← Main chat UI (client-only, ssr: false)
-│   │   ├── ToolPartView.tsx   ← Tool execution state rendering
-│   │   └── ThemeToggle.tsx    ← Dark/light mode toggle
+│   │   └── ToolPartView.tsx   ← Tool execution state rendering (search summaries, calendar download, approvals)
 │   ├── DefaultCatchBoundary.tsx
 │   ├── NotFound.tsx
 │   └── Header.tsx
@@ -33,7 +33,9 @@ src/
 
 - **TanStack Start** handles routing, SSR, server functions
 - **ChatAgent** Durable Object is exported from `server/entry.ts`
-- **AI binding** (Workers AI) is configured in `wrangler.jsonc`
+- **Workers AI** binding configured in `wrangler.jsonc`, routed through **AI Gateway** (`ethcc-planner`) for observability/analytics
+- **KV** (`ETHCC_CACHE`) caches EthCC API responses (1hr TTL)
+- **Agent tools**: `searchTalks` (with pagination), `getTalkDetails`, `getConferenceInfo`, `generateCalendarFile` (.ics export)
 - Server code lives in `src/server/`, client code in `src/components/` and `src/routes/`
 - Simple, single deploy, single worker
 

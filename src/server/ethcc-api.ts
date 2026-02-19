@@ -120,7 +120,7 @@ export async function fetchLocations(kv: KVNamespace): Promise<EthccLocation[]> 
 
 // --- Search & filter helpers ---
 
-const REAL_TALK_TYPES = new Set(["Talk", "Workshop"]);
+const REAL_TALK_TYPES = new Set(["Talk", "Workshop", "Demo"]);
 
 /** Filter out admin items (lunch, doors, etc.) -- keep only Talk and Workshop */
 export function filterRealTalks(talks: EthccTalk[]): EthccTalk[] {

@@ -220,7 +220,7 @@ Current date: ${new Date().toISOString().split("T")[0]}`,
       },
       maxOutputTokens: 2048,
       onFinish,
-      stopWhen: stepCountIs(3),
+      stopWhen: stepCountIs(5),
       abortSignal: options?.abortSignal
     });
 
