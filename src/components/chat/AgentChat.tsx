@@ -240,9 +240,9 @@ function Chat() {
 
                     return (
                       <div key={i} className="flex justify-start">
-                        <div className="max-w-[85%] rounded-2xl rounded-bl-md bg-background text-foreground leading-relaxed">
+                        <div className="max-w-[85%] overflow-x-auto rounded-2xl rounded-bl-md bg-background text-foreground leading-relaxed">
                           <Streamdown
-                            className="sd-theme rounded-2xl rounded-bl-md p-3"
+                            className="rounded-2xl rounded-bl-md p-3"
                             controls={false}
                             isAnimating={isLastAssistant && isStreaming}
                           >

@@ -53,7 +53,10 @@ export class ChatAgent extends AIChatAgent<Env> {
     onFinish: StreamTextOnFinishCallback<ToolSet>,
     options?: { abortSignal?: AbortSignal }
   ) {
-    const workersai = createWorkersAI({ binding: this.env.AI });
+    const workersai = createWorkersAI({
+      binding: this.env.AI,
+      gateway: { id: "ethcc-planner" },
+    });
     const kv = this.env.ETHCC_CACHE;
 
     const result = streamText({
@@ -65,24 +68,23 @@ Conference: EthCC[8], June 30 - July 3 2025, Palais des Festivals, Cannes, Franc
 
 Available tracks: Core Protocol | DeFi | Zero Knowledge & Cryptography | Security | Layer 2s, Layers above and beyond | Cypherpunk & Privacy | Token Engineering | For Developers and Users | Product & Marketers | The Unexpected | Real World Ethereum | Entertainment | Governance
 
-IMPORTANT — Response style:
-- Be SHORT and direct. No filler, no "Let me search", no "Great question!"
-- Show at most 10 talks in a markdown table. NEVER output more than 10 rows. If there are more results, mention the total and ask the user to filter further.
-- Table columns: Date | Time | Title | Speaker | Room
-- Flag time conflicts clearly
-- Do NOT repeat or echo tool output — the UI already shows tool results. Just present your curated summary.
-- Do NOT show raw ICS/calendar content — the UI has a download button for that
-- After generating a calendar file, just say "Your calendar is ready — use the download button above"
-- When the user asks you to narrow down or filter results you already have, reason about the data yourself — do NOT make another search call
+STRICT RULES:
+1. Be SHORT. No filler ("Let me search", "Great question!", "I parsed the tool output"). Just answer.
+2. Max 10 talks in a markdown table: Date | Time | Title | Speaker | Room. If more exist, say the total and ask the user to filter.
+3. Flag time conflicts.
+4. Do NOT echo tool output — the UI already shows it.
+5. Do NOT show raw ICS content. After generating a calendar, just say "Your calendar is ready — use the download button above."
+6. NEVER invent, guess, or fabricate talk data. Every talk you mention MUST come from a tool result. If you don't have the data, call the tool.
+7. When the user asks to "pick favorites" or "narrow down" from results you already have in context, reason about the data yourself.
+8. When the user asks for "more", "next", or "remaining" talks, call searchTalks again with the offset parameter to paginate. Example: first call returned 10 of 35 → next call uses offset:10.
 
-Tool usage:
-- ALWAYS use the "track" parameter when the user asks for talks in a specific track. Map user intent to the closest track name above. Examples: "DeFi talks" → track:"DeFi", "L2 talks" → track:"Layer 2", "ZK talks" → track:"Zero Knowledge", "security talks" → track:"Security".
-- Use "query" ONLY for free-text keyword search that doesn't map to a track (e.g. "Vitalik", "MEV", "account abstraction").
-- Make ONE search call. Never retry or make a second search call.
-- searchTalks results already include title, start, end, room, speakers, and slug. Use this data DIRECTLY to generate calendar files — do NOT call getTalkDetails first.
-- Only use getTalkDetails when the user asks for more info about a specific talk, and ALWAYS use the exact slug from the searchTalks output. Never guess or construct slugs.
+Tool rules (CRITICAL — violating these is an error):
+- You may call searchTalks AT MOST ONCE per user message. NEVER call it twice in the same response.
+- Use the "track" parameter when the user asks for a specific track. Map: "DeFi talks" → track:"DeFi", "L2 talks" → track:"Layer 2", "ZK talks" → track:"Zero Knowledge", "security talks" → track:"Security".
+- Use "query" ONLY for free-text keyword search (e.g. "Vitalik", "MEV", "account abstraction").
+- searchTalks results already contain title, start, end, room, speakers, slug. Use this data DIRECTLY for generateCalendarFile — do NOT call getTalkDetails first.
+- Only call getTalkDetails when the user wants details about ONE specific talk. Use the exact slug from searchTalks.
 - Only call getConferenceInfo when the user explicitly asks about tracks, days, or rooms.
-- The query parameter supports multi-word search (each word matched independently, words under 3 chars are ignored). Use short, targeted keywords.
 
 Current date: ${new Date().toISOString().split("T")[0]}`,
       messages: pruneMessages({
@@ -91,14 +93,15 @@ Current date: ${new Date().toISOString().split("T")[0]}`,
       }),
       tools: {
         searchTalks: tool({
-          description: "Search EthCC talks by keyword, track, date, or type. Use this when the user asks about talks, sessions, or wants recommendations based on their interests.",
+          description: "Search EthCC talks by keyword, track, date, or type. Use this when the user asks about talks, sessions, or wants recommendations based on their interests. Use offset to paginate when the user asks for 'more' or 'next' results.",
           inputSchema: z.object({
             query: z.string().optional().describe("Free-text search (e.g. 'ZK proofs', 'DeFi yields', 'Vitalik')"),
             track: z.string().optional().describe("Filter by track name (e.g. 'DeFi', 'Zero Knowledge & Cryptography', 'Security')"),
             date: z.string().optional().describe("Filter by date in YYYY-MM-DD format (2025-06-30 to 2025-07-03)"),
-            limit: z.number().optional().default(15).describe("Max results to return"),
+            limit: z.number().optional().default(10).describe("Max results to return"),
+            offset: z.number().optional().default(0).describe("Number of results to skip (for pagination). E.g. if you already showed 10, use offset:10 to get the next batch."),
           }),
-          execute: async ({ query, track, date, limit }) => {
+          execute: async ({ query, track, date, limit, offset }) => {
             let talks = await fetchTalks(kv);
             talks = filterRealTalks(talks);
 
@@ -108,9 +111,10 @@ Current date: ${new Date().toISOString().split("T")[0]}`,
 
             talks.sort((a, b) => a.start.localeCompare(b.start));
 
-            const results = talks.slice(0, limit).map(formatTalkForAI);
+            const paged = talks.slice(offset, offset + limit);
+            const results = paged.map(formatTalkForAI);
             return results.length > 0
-              ? { talks: results, totalMatches: talks.length, showing: results.length }
+              ? { talks: results, totalMatches: talks.length, showing: results.length, offset }
               : "No talks found matching your criteria. Try broadening your search or check available tracks with getConferenceInfo.";
           },
         }),
@@ -216,7 +220,7 @@ Current date: ${new Date().toISOString().split("T")[0]}`,
       },
       maxOutputTokens: 2048,
       onFinish,
-      stopWhen: stepCountIs(5),
+      stopWhen: stepCountIs(3),
       abortSignal: options?.abortSignal
     });
 
