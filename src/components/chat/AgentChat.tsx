@@ -28,15 +28,27 @@ const STARTER_PROMPTS = [
   "What talks are about Layer 2 scaling?",
 ];
 
+function getSessionId(): string {
+  const key = "ethcc-planner-session";
+  let id = localStorage.getItem(key);
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem(key, id);
+  }
+  return id;
+}
+
 function Chat() {
   const [connected, setConnected] = useState(false);
   const [input, setInput] = useState("");
   const [showDebug, setShowDebug] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [sessionId] = useState(getSessionId);
 
   const agent = useAgent({
     agent: "ChatAgent",
+    id: sessionId,
     onOpen: useCallback(() => setConnected(true), []),
     onClose: useCallback(() => setConnected(false), []),
     onError: useCallback(
