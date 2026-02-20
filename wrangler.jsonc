@@ -31,6 +31,13 @@
 			}
 		]
 	},
+	"workflows": [
+		{
+			"name": "twitter-analysis",
+			"binding": "TWITTER_ANALYSIS_WORKFLOW",
+			"class_name": "TwitterAnalysisWorkflow"
+		}
+	],
 	"migrations": [
 		{
 			"new_sqlite_classes": [

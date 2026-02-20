@@ -133,6 +133,17 @@ export function searchTalksLocal(talks: EthccTalk[], query: string): EthccTalk[]
   const words = query.toLowerCase().split(/\s+/).filter((w) => w.length >= 3);
   if (words.length === 0) return talks;
 
+  // Compute IDF: rare words score higher than common ones
+  const wordDocCounts = new Map<string, number>();
+  for (const w of words) {
+    let count = 0;
+    for (const t of talks) {
+      const blob = `${t.title} ${t.extendedProps.track} ${t.extendedProps.description ?? ""} ${t.extendedProps.speakersData.map((s) => `${s.displayName} ${s.organization}`).join(" ")}`.toLowerCase();
+      if (blob.includes(w)) count++;
+    }
+    wordDocCounts.set(w, count);
+  }
+
   const scored = talks
     .map((t) => {
       const title = t.title.toLowerCase();
@@ -145,10 +156,15 @@ export function searchTalksLocal(talks: EthccTalk[], query: string): EthccTalk[]
 
       let score = 0;
       for (const w of words) {
-        if (title.includes(w)) score += 3;
-        else if (track.includes(w)) score += 2;
-        else if (speakers.includes(w)) score += 2;
-        else if (desc.includes(w)) score += 1;
+        const docCount = wordDocCounts.get(w) ?? 1;
+        // IDF weight: log(totalDocs / docsWithTerm). Rare terms score much higher.
+        const idf = Math.log(talks.length / Math.max(docCount, 1));
+        const weight = Math.max(idf, 0.5); // floor at 0.5 so common terms still count a little
+
+        if (title.includes(w)) score += 3 * weight;
+        else if (track.includes(w)) score += 2 * weight;
+        else if (speakers.includes(w)) score += 2 * weight;
+        else if (desc.includes(w)) score += 1 * weight;
       }
       return { talk: t, score };
     })
@@ -156,6 +172,68 @@ export function searchTalksLocal(talks: EthccTalk[], query: string): EthccTalk[]
 
   scored.sort((a, b) => b.score - a.score || a.talk.start.localeCompare(b.talk.start));
   return scored.map(({ talk }) => talk);
+}
+
+/**
+ * Search talks by multiple interest topics independently, then merge and rank.
+ * Talks matching more interests rank higher. Within same interest count,
+ * talks are ranked by cumulative IDF-weighted score.
+ */
+export function searchByInterests(talks: EthccTalk[], interests: string[]): EthccTalk[] {
+  if (interests.length === 0) return talks;
+
+  // For each talk, track which interests it matched and its total score
+  const talkScores = new Map<string, { talk: EthccTalk; interestCount: number; totalScore: number; matchedInterests: string[] }>();
+
+  for (const interest of interests) {
+    const matches = searchTalksLocal(talks, interest);
+    // searchTalksLocal returns sorted by score, position implies score rank
+    for (let i = 0; i < matches.length; i++) {
+      const talk = matches[i]!;
+      // Score decreases with position: top result gets highest score
+      const positionScore = matches.length - i;
+      const existing = talkScores.get(talk.id);
+      if (existing) {
+        existing.interestCount++;
+        existing.totalScore += positionScore;
+        existing.matchedInterests.push(interest);
+      } else {
+        talkScores.set(talk.id, {
+          talk,
+          interestCount: 1,
+          totalScore: positionScore,
+          matchedInterests: [interest],
+        });
+      }
+    }
+  }
+
+  const entries = [...talkScores.values()];
+  // Primary: more interests matched. Secondary: higher cumulative score. Tertiary: time.
+  entries.sort((a, b) =>
+    b.interestCount - a.interestCount
+    || b.totalScore - a.totalScore
+    || a.talk.start.localeCompare(b.talk.start)
+  );
+
+  return entries.map((e) => e.talk);
+}
+
+/** Get matched interests for a talk (for display in results) */
+export function getInterestMatches(talks: EthccTalk[], interests: string[]): Map<string, string[]> {
+  const matches = new Map<string, string[]>();
+  for (const interest of interests) {
+    const results = searchTalksLocal(talks, interest);
+    for (const talk of results) {
+      const existing = matches.get(talk.id);
+      if (existing) {
+        existing.push(interest);
+      } else {
+        matches.set(talk.id, [interest]);
+      }
+    }
+  }
+  return matches;
 }
 
 export function filterByTrack(talks: EthccTalk[], track: string): EthccTalk[] {

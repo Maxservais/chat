@@ -5,6 +5,9 @@ import handler from "@tanstack/react-start/server-entry";
 // Export the Durable Object class — Cloudflare requires this from the main module
 export { ChatAgent } from "./agent";
 
+// Export the Workflow class — Cloudflare requires this from the main module
+export { TwitterAnalysisWorkflow } from "./twitter-workflow";
+
 export default {
   async fetch(request: Request) {
     // Handle agent WebSocket/API requests (/agents/*)

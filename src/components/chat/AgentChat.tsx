@@ -17,16 +17,34 @@ import {
   BrainIcon,
   CaretDownIcon,
   BugIcon,
+  XLogoIcon,
+  SpinnerIcon,
+  CheckCircleIcon,
 } from "@phosphor-icons/react";
 
 import { ToolPartView } from "./ToolPartView";
 
 const STARTER_PROMPTS = [
-  "I'm interested in ZK proofs and privacy",
-  "Show me all DeFi talks",
-  "Help me plan my schedule for Day 1",
-  "What talks are about Layer 2 scaling?",
+  { label: "Share my Twitter profile", prefill: "My Twitter is @" },
+  { label: "ZK proofs and privacy", prefill: "I'm interested in ZK proofs and privacy" },
+  { label: "DeFi talks", prefill: "Show me all DeFi talks" },
+  { label: "Plan my Day 1", prefill: "Help me plan my schedule for Day 1" },
+  { label: "Layer 2 scaling", prefill: "What talks are about Layer 2 scaling?" },
 ];
+
+interface WorkflowProgress {
+  step: string;
+  status: "running" | "complete" | "error";
+  message: string;
+  percent?: number;
+}
+
+interface TwitterProfile {
+  handle: string;
+  interests: string[];
+  summary: string;
+  tweetCount: number;
+}
 
 function getSessionId(): string {
   const key = "ethcc-planner-session";
@@ -42,6 +60,10 @@ function Chat() {
   const [connected, setConnected] = useState(false);
   const [input, setInput] = useState("");
   const [showDebug, setShowDebug] = useState(false);
+  const [workflowProgress, setWorkflowProgress] =
+    useState<WorkflowProgress | null>(null);
+  const [twitterProfile, setTwitterProfile] =
+    useState<TwitterProfile | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [sessionId] = useState(getSessionId);
@@ -55,7 +77,26 @@ function Chat() {
       (error: Event) => console.error("WebSocket error:", error),
       []
     ),
-    onMessage: useCallback(() => {}, []),
+    onMessage: useCallback((event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "workflow-progress") {
+          setWorkflowProgress({
+            step: data.step,
+            status: data.status,
+            message: data.message,
+            percent: data.percent,
+          });
+        } else if (data.type === "workflow-complete") {
+          setWorkflowProgress(null);
+          setTwitterProfile(data.result as TwitterProfile);
+        } else if (data.type === "workflow-error") {
+          setWorkflowProgress(null);
+        }
+      } catch {
+        // Not a workflow JSON event — ignore (normal chat messages)
+      }
+    }, []),
   });
 
   const {
@@ -86,6 +127,7 @@ function Chat() {
     const text = input.trim();
     if (!text || isStreaming) return;
     setInput("");
+    setWorkflowProgress(null);
     sendMessage({ role: "user", parts: [{ type: "text", text }] });
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -126,7 +168,11 @@ function Chat() {
                 aria-label="Toggle debug mode"
               />
             </div>
-            <Button variant="outline" size="sm" onClick={clearHistory}>
+            <Button variant="outline" size="sm" onClick={() => {
+              clearHistory();
+              setTwitterProfile(null);
+              setWorkflowProgress(null);
+            }}>
               <TrashIcon size={16} />
               Clear
             </Button>
@@ -138,29 +184,32 @@ function Chat() {
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-3xl mx-auto px-5 py-6 space-y-5">
           {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <ChatCircleDotsIcon size={32} className="text-muted-foreground mb-3" />
-              <p className="text-sm font-medium text-foreground mb-1">
-                Plan your EthCC agenda
-              </p>
-              <p className="text-xs text-muted-foreground mb-1">
-                Tell me your interests and I'll find the best talks
-              </p>
-              <div className="flex flex-wrap justify-center gap-2 mt-3">
+            <div className="space-y-4">
+              {/* Welcome message from the assistant */}
+              <div className="flex justify-start">
+                <div className="max-w-[85%] px-4 py-3 rounded-2xl rounded-bl-md bg-background text-foreground leading-relaxed space-y-1">
+                  <p className="text-sm font-medium">
+                    Hey! I'm your EthCC[8] agenda planner.
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Share your Twitter/X profile and I'll analyze your interests to find the best talks for you. Or just tell me what topics you're into.
+                  </p>
+                </div>
+              </div>
+              {/* Starter prompts — fill the input bar on click */}
+              <div className="flex flex-wrap gap-2 pl-1">
                 {STARTER_PROMPTS.map((prompt) => (
                   <Button
-                    key={prompt}
+                    key={prompt.label}
                     variant="outline"
                     size="sm"
                     disabled={isStreaming}
                     onClick={() => {
-                      sendMessage({
-                        role: "user",
-                        parts: [{ type: "text", text: prompt }],
-                      });
+                      setInput(prompt.prefill);
+                      textareaRef.current?.focus();
                     }}
                   >
-                    {prompt}
+                    {prompt.label}
                   </Button>
                 ))}
               </div>
@@ -250,6 +299,55 @@ function Chat() {
                       );
                     }
 
+                    // Render the Twitter profile card inline with the profile message
+                    const isProfileMessage =
+                      twitterProfile &&
+                      message.id === `twitter-profile-${twitterProfile.handle}`;
+                    if (isProfileMessage) {
+                      return (
+                        <div key={i} className="space-y-3">
+                          {/* Profile card */}
+                          <div className="flex justify-start">
+                            <div className="max-w-[85%] px-4 py-3 rounded-xl bg-background border border-border space-y-2">
+                              <div className="flex items-center gap-2">
+                                <CheckCircleIcon
+                                  size={16}
+                                  className="text-green-500"
+                                  weight="fill"
+                                />
+                                <span className="text-sm font-medium text-foreground">
+                                  Profile analyzed: @{twitterProfile.handle}
+                                </span>
+                                <Badge variant="secondary" className="text-xs">
+                                  {twitterProfile.tweetCount} tweets
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                {twitterProfile.summary}
+                              </p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {twitterProfile.interests.map((interest) => (
+                                  <Badge
+                                    key={interest}
+                                    variant="outline"
+                                    className="text-xs"
+                                  >
+                                    {interest}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                          {/* Follow-up prompt as a normal assistant bubble */}
+                          <div className="flex justify-start">
+                            <div className="max-w-[85%] px-4 py-2.5 rounded-2xl rounded-bl-md bg-background text-foreground text-sm leading-relaxed">
+                              Want me to find EthCC talks matching these interests? You can also refine or add topics.
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
                     return (
                       <div key={i} className="flex justify-start">
                         <div className="max-w-[85%] overflow-x-auto rounded-2xl rounded-bl-md bg-background text-foreground leading-relaxed">
@@ -267,6 +365,34 @@ function Chat() {
               </div>
             );
           })}
+
+          {/* Workflow progress indicator (only while workflow is actively running) */}
+          {workflowProgress && workflowProgress.status !== "error" && (
+            <div className="flex justify-start">
+              <div className="max-w-[85%] px-4 py-3 rounded-xl bg-background border border-border space-y-2">
+                <div className="flex items-center gap-2">
+                  <XLogoIcon size={16} className="text-foreground" />
+                  <span className="text-sm font-medium text-foreground">
+                    Twitter Analysis
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <SpinnerIcon size={14} className="text-primary animate-spin" />
+                  <span className="text-sm text-muted-foreground">
+                    {workflowProgress.message}
+                  </span>
+                </div>
+                {workflowProgress.percent != null && (
+                  <div className="w-full bg-muted rounded-full h-1.5">
+                    <div
+                      className="bg-primary h-1.5 rounded-full transition-all duration-500"
+                      style={{ width: `${workflowProgress.percent * 100}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <div ref={messagesEndRef} />
         </div>

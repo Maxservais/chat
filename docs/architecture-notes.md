@@ -7,11 +7,13 @@ Single Cloudflare Worker that handles everything:
 ```
 src/
 ├── server/
-│   ├── entry.ts              ← Cloudflare Worker entry (main)
+│   ├── entry.ts              ← Cloudflare Worker entry (main), exports ChatAgent + TwitterAnalysisWorkflow
 │   │   ├── routeAgentRequest()  → /agents/* → ChatAgent Durable Object (WebSocket)
 │   │   └── TanStack Start handler → everything else → SSR pages, server functions
-│   ├── agent.ts              ← ChatAgent Durable Object class (tools, system prompt, ICS generation)
+│   ├── agent.ts              ← ChatAgent Durable Object class (tools, system prompt, ICS generation, workflow callbacks)
 │   ├── ethcc-api.ts          ← EthCC tRPC API client, KV caching, search/filter helpers
+│   ├── twitter-scraper.ts    ← Apify Tweet Scraper V2 API integration
+│   ├── twitter-workflow.ts   ← TwitterAnalysisWorkflow (AgentWorkflow): scrape tweets → summarize interests
 │   ├── middleware/            ← TanStack Start server middleware (future)
 │   └── functions/             ← TanStack Start server functions (future)
 ├── components/
@@ -36,6 +38,7 @@ src/
 - **Workers AI** binding configured in `wrangler.jsonc`, routed through **AI Gateway** (`ethcc-planner`) for observability/analytics
 - **KV** (`ETHCC_CACHE`) caches EthCC API responses (1hr TTL)
 - **Agent tools**: `searchTalks` (with pagination), `getTalkDetails`, `getConferenceInfo`, `generateCalendarFile` (.ics export)
+- **Twitter analysis**: `TwitterAnalysisWorkflow` (Cloudflare Workflow) scrapes tweets via Apify, summarizes interests via `llama-3.3-70b`. Agent triggers workflow when user shares their handle, interests are injected into system prompt for personalized recommendations. See [twitter-analysis-feature.md](./twitter-analysis-feature.md) for details.
 - Server code lives in `src/server/`, client code in `src/components/` and `src/routes/`
 - Simple, single deploy, single worker
 
