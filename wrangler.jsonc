@@ -17,6 +17,7 @@
 		"binding": "AI",
 		"remote": true
 	},
+	"worker_loaders": [{ "binding": "LOADER" }],
 	"kv_namespaces": [
 		{
 			"binding": "ETHCC_CACHE",
