@@ -137,19 +137,24 @@ function Chat() {
   return (
     <div className="flex flex-col h-full bg-muted/30">
       {/* Header */}
-      <header className="px-5 py-4 bg-background border-b border-border">
-        <div className="max-w-3xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-lg font-semibold text-foreground">
-              <span className="mr-2">📅</span>EthCC Planner
+      <header className="px-3 sm:px-5 py-2.5 sm:py-4 bg-background border-b border-border">
+        <div className="max-w-3xl mx-auto flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <h1 className="text-base sm:text-lg font-semibold text-foreground whitespace-nowrap">
+              <span className="mr-1.5">📅</span>EthCC Planner
             </h1>
-            <Badge variant="secondary">
+            <Badge variant="secondary" className="hidden sm:inline-flex">
               <ChatCircleDotsIcon size={12} weight="bold" className="mr-1" />
               Agenda Assistant
             </Badge>
+            <CircleIcon
+              size={8}
+              weight="fill"
+              className={`sm:hidden shrink-0 ${connected ? "text-green-500" : "text-destructive"}`}
+            />
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <div className="hidden sm:flex items-center gap-1.5">
               <CircleIcon
                 size={8}
                 weight="fill"
@@ -174,7 +179,7 @@ function Chat() {
               setWorkflowProgress(null);
             }}>
               <TrashIcon size={16} />
-              Clear
+              <span className="hidden sm:inline">Clear</span>
             </Button>
           </div>
         </div>
@@ -182,12 +187,12 @@ function Chat() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-5 py-6 space-y-5">
+        <div className="max-w-3xl mx-auto px-3 sm:px-5 py-4 sm:py-6 space-y-4 sm:space-y-5">
           {messages.length === 0 && (
             <div className="space-y-4">
               {/* Welcome message from the assistant */}
               <div className="flex justify-start">
-                <div className="max-w-[85%] px-4 py-3 rounded-2xl rounded-bl-md bg-background text-foreground leading-relaxed space-y-1">
+                <div className="max-w-[90%] sm:max-w-[85%] px-4 py-3 rounded-2xl rounded-bl-md bg-background text-foreground leading-relaxed space-y-1">
                   <p className="text-sm font-medium">
                     Hey! I'm your EthCC[8] agenda planner.
                   </p>
@@ -254,7 +259,7 @@ function Chat() {
                     const isDone = reasoning.state === "done" || !isStreaming;
                     return (
                       <div key={i} className="flex justify-start">
-                        <details className="max-w-[85%] w-full" open={!isDone}>
+                        <details className="max-w-[90%] sm:max-w-[85%] w-full" open={!isDone}>
                           <summary className="flex items-center gap-2 cursor-pointer px-3 py-2 rounded-lg bg-purple-500/10 border border-purple-500/20 text-sm select-none">
                             <BrainIcon size={14} className="text-purple-500" />
                             <span className="font-medium text-foreground">
@@ -292,7 +297,7 @@ function Chat() {
                     if (isUser) {
                       return (
                         <div key={i} className="flex justify-end">
-                          <div className="max-w-[85%] px-4 py-2.5 rounded-2xl rounded-br-md bg-primary text-primary-foreground leading-relaxed">
+                          <div className="max-w-[90%] sm:max-w-[85%] px-4 py-2.5 rounded-2xl rounded-br-md bg-primary text-primary-foreground leading-relaxed">
                             {text}
                           </div>
                         </div>
@@ -308,7 +313,7 @@ function Chat() {
                         <div key={i} className="space-y-3">
                           {/* Profile card */}
                           <div className="flex justify-start">
-                            <div className="max-w-[85%] px-4 py-3 rounded-xl bg-background border border-border space-y-2">
+                            <div className="max-w-[90%] sm:max-w-[85%] px-4 py-3 rounded-xl bg-background border border-border space-y-2">
                               <div className="flex items-center gap-2">
                                 <CheckCircleIcon
                                   size={16}
@@ -340,7 +345,7 @@ function Chat() {
                           </div>
                           {/* Follow-up prompt as a normal assistant bubble */}
                           <div className="flex justify-start">
-                            <div className="max-w-[85%] px-4 py-2.5 rounded-2xl rounded-bl-md bg-background text-foreground text-sm leading-relaxed">
+                            <div className="max-w-[90%] sm:max-w-[85%] px-4 py-2.5 rounded-2xl rounded-bl-md bg-background text-foreground text-sm leading-relaxed">
                               Want me to find EthCC talks matching these interests? You can also refine or add topics.
                             </div>
                           </div>
@@ -350,7 +355,7 @@ function Chat() {
 
                     return (
                       <div key={i} className="flex justify-start">
-                        <div className="max-w-[85%] overflow-x-auto rounded-2xl rounded-bl-md bg-background text-foreground leading-relaxed">
+                        <div className="max-w-[90%] sm:max-w-[85%] overflow-x-auto rounded-2xl rounded-bl-md bg-background text-foreground leading-relaxed">
                           <Streamdown
                             className="rounded-2xl rounded-bl-md p-3"
                             controls={false}
@@ -369,7 +374,7 @@ function Chat() {
           {/* Workflow progress indicator (only while workflow is actively running) */}
           {workflowProgress && workflowProgress.status !== "error" && (
             <div className="flex justify-start">
-              <div className="max-w-[85%] px-4 py-3 rounded-xl bg-background border border-border space-y-2">
+              <div className="max-w-[90%] sm:max-w-[85%] px-4 py-3 rounded-xl bg-background border border-border space-y-2">
                 <div className="flex items-center gap-2">
                   <XLogoIcon size={16} className="text-foreground" />
                   <span className="text-sm font-medium text-foreground">
@@ -399,13 +404,13 @@ function Chat() {
       </div>
 
       {/* Input */}
-      <div className="border-t border-border bg-background">
+      <div className="border-t border-border bg-background pb-[env(safe-area-inset-bottom)]">
         <form
           onSubmit={(e) => {
             e.preventDefault();
             send();
           }}
-          className="max-w-3xl mx-auto px-5 py-4"
+          className="max-w-3xl mx-auto px-3 sm:px-5 py-3 sm:py-4"
         >
           <div className="flex items-end gap-3 rounded-xl border border-border bg-background p-3 shadow-sm focus-within:ring-2 focus-within:ring-ring focus-within:border-transparent transition-shadow">
             <Textarea

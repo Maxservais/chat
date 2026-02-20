@@ -26,7 +26,7 @@ export const Route = createRootRouteWithContext<{
       },
       {
         name: 'viewport',
-        content: 'width=device-width, initial-scale=1',
+        content: 'width=device-width, initial-scale=1, viewport-fit=cover',
       },
       ...seo({
         title: 'EthCC Planner — AI Agenda Assistant',
@@ -67,7 +67,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body className="flex flex-col h-screen">
-        <Header />
+        <div className="hidden sm:block">
+          <Header />
+        </div>
         <main className="flex-1 flex flex-col min-h-0">
           {children}
         </main>
