@@ -48,7 +48,7 @@ function Chat() {
 
   const agent = useAgent({
     agent: "ChatAgent",
-    id: sessionId,
+    name: sessionId,
     onOpen: useCallback(() => setConnected(true), []),
     onClose: useCallback(() => setConnected(false), []),
     onError: useCallback(
